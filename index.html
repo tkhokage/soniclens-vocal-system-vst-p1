@@ -1,0 +1,22 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Voice Analyzer</title>
+  </head>
+  <body>
+    <script>
+      (function(){
+        try {
+          const saved = localStorage.getItem('theme');
+          const prefersLight = window.matchMedia && window.matchMedia('(prefers-color-scheme: light)').matches;
+          const theme = saved || (prefersLight ? 'light' : 'dark');
+          if (theme === 'light') document.body.classList.add('light-mode');
+        } catch(e) { /* ignore */ }
+      })();
+    </script>
+    <div id="root"></div>
+    <script type="module" src="/src/main.tsx"></script>
+  </body>
+</html>

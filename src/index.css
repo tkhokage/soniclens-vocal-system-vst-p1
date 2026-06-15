@@ -1,0 +1,134 @@
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap');
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  --font-sans: "Inter", ui-sans-serif, system-ui, sans-serif;
+  --font-mono: "JetBrains Mono", ui-monospace, SFMono-Regular, monospace;
+}
+
+/* PS5 / Console-inspired design tokens */
+:root {
+  --bg-900: #05060a;
+  --bg-800: #0b0d12;
+  --panel: rgba(255,255,255,0.03);
+  --glass: rgba(255,255,255,0.04);
+  --muted: #94a3b8;
+  --accent-start: #66d9ff;
+  --accent-end: #8a5bff;
+  --neon: #00e5ff;
+  --text: #e6eef8;
+  --shadow-neon: 0 8px 30px rgba(102,217,255,0.08), 0 2px 8px rgba(138,91,255,0.06);
+}
+
+/* Shell background */
+.ps5-shell {
+  background: radial-gradient(1200px 600px at 10% 10%, rgba(102,217,255,0.03), transparent 6%),
+              radial-gradient(800px 400px at 90% 80%, rgba(138,91,255,0.03), transparent 6%),
+              linear-gradient(180deg, var(--bg-900), var(--bg-800));
+  color: var(--text);
+  min-height: 100vh;
+  font-family: var(--font-sans);
+}
+
+/* Header */
+.ps5-header {
+  backdrop-filter: blur(8px) saturate(120%);
+  background: linear-gradient(90deg, rgba(255,255,255,0.02), rgba(255,255,255,0.01));
+  border-bottom: 1px solid rgba(255,255,255,0.03);
+  box-shadow: var(--shadow-neon);
+}
+.ps5-logo{
+  width:48px;height:48px;border-radius:10px;display:inline-flex;align-items:center;justify-content:center;font-weight:800;font-size:18px;color:var(--bg-900);background:linear-gradient(135deg,var(--accent-start),var(--accent-end));box-shadow:0 6px 18px rgba(138,91,255,0.12);
+}
+
+.ps5-title { font-size:1.25rem; font-weight:800; letter-spacing:-0.02em }
+.ps5-sub { color:var(--muted); font-size:0.9rem }
+
+/* Panels */
+.ps5-panel {
+  background: linear-gradient(180deg, rgba(255,255,255,0.02), rgba(255,255,255,0.01));
+  border: 1px solid rgba(255,255,255,0.04);
+  border-radius: 14px;
+  padding: 1rem;
+  box-shadow: 0 8px 30px rgba(2,6,23,0.6), 0 2px 6px rgba(0,0,0,0.6);
+}
+
+.ps5-btn{
+  background: linear-gradient(90deg,var(--accent-start),var(--accent-end));
+  color:#021026;font-weight:700;padding:0.5rem 0.9rem;border-radius:10px;border:none;box-shadow:0 6px 20px rgba(102,217,255,0.12);transition:transform .12s ease;cursor:pointer;
+}
+.ps5-btn:hover { opacity: 0.9 }
+.ps5-btn:active{ transform: translateY(1px) scale(.995) }
+
+/* Accent glow for important elements */
+.neon-glow { box-shadow: 0 8px 40px rgba(102,217,255,0.12); border: 1px solid rgba(102,217,255,0.06) }
+
+/* Make existing panels feel more 'console' like */
+.ps5-panel-compact{ padding:0.75rem;border-radius:12px }
+
+/* Tailwind utility classes for glass morphism and common patterns */
+.bg-glass { background-color: rgba(255, 255, 255, 0.04) }
+.border-glass { border: 1px solid rgba(255, 255, 255, 0.05) }
+.glass-panel { background-color: rgba(255, 255, 255, 0.02); border: 1px solid rgba(255, 255, 255, 0.04); backdrop-filter: blur(4px) }
+.text-muted { color: #94a3b8 }
+
+/* Fluid keyframe animations for sleek entry and pulsing spectrum nodes */
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+    transform: translateY(6px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.animate-fadeIn {
+  animation: fadeIn 0.4s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+
+/* Custom gorgeous scrollbar for sleek Spotify/Apple-like card feel */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+::-webkit-scrollbar-thumb {
+  background: rgba(255, 255, 255, 0.12);
+  border-radius: 9999px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: rgba(255, 255, 255, 0.25);
+}
+
+/* Temporary quick light-mode override to improve visibility */
+.light-mode {
+  filter: brightness(1.45) saturate(1.05);
+}
+
+.light-mode .bg-[#121212],
+.light-mode .bg-black,
+.light-mode .bg-zinc-950,
+.light-mode .bg-zinc-900 {
+  background-color: #f6f7f9 !important;
+}
+
+.light-mode .text-zinc-400,
+.light-mode .text-zinc-500,
+.light-mode .text-zinc-600 {
+  color: #334155 !important;
+}
+
+.light-mode .border-zinc-900,
+.light-mode .border-zinc-950 {
+  border-color: rgba(0,0,0,0.06) !important;
+}
