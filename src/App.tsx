@@ -14,6 +14,7 @@ import {
 import SpotifyPlayerCard from "./components/SpotifyPlayerCard";
 import VstPresetsDeck from "./components/VstPresetsDeck";
 import ThemeToggle from "./components/ThemeToggle";
+import AiChatBox from "./components/AiChatBox";
 
 const INITIAL_DEMO: VocalRecipe = {
   id: "demo-travis",
@@ -257,6 +258,7 @@ export default function App() {
         }}
         className="hidden"
       />
+      <AiChatBox />
     </div>
   );
 }
