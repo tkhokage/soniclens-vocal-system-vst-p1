@@ -2,7 +2,7 @@ import React, { useEffect, useRef, useState } from "react";
 
 type Message = { id: string; from: "user" | "assistant"; text: string };
 
-export default function AiChatBox() {
+export default function AiChatBox({ contextProvider }: { contextProvider?: () => any }) {
   const [messages, setMessages] = useState<Message[]>([]);
   const [input, setInput] = useState("");
   const [sessionId, setSessionId] = useState<string | null>(null);
@@ -52,10 +52,11 @@ export default function AiChatBox() {
     setMessages((m) => [...m, userMsg, { id: String(Date.now() + 1), from: "assistant", text: "" }]);
 
     // send to server
+    const context = contextProvider ? contextProvider() : {};
     const res = await fetch("/chat", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ message: input }),
+      body: JSON.stringify({ message: input, context }),
     });
     const body = await res.json();
     if (body && body.id) {

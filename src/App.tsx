@@ -258,7 +258,7 @@ export default function App() {
         }}
         className="hidden"
       />
-      <AiChatBox />
+      <AiChatBox contextProvider={() => ({ activeRecipe, uploadedFiles, settings: { retuneCtrl, highpassCtrl, presenceCtrl, driveCtrl, reverbMixCtrl, reverbDecayCtrl, delayFbCtrl } })} />
     </div>
   );
 }

@@ -1,6 +1,7 @@
 const express = require('express');
 const bodyParser = require('body-parser');
 const crypto = require('crypto');
+require('dotenv').config();
 
 const app = express();
 app.use(bodyParser.json({ limit: '5mb' }));
@@ -8,18 +9,87 @@ app.use(bodyParser.json({ limit: '5mb' }));
 // simple in-memory stream registry
 const streams = new Map();
 
-app.post('/chat', (req, res) => {
-  const { message } = req.body || {};
+app.post('/chat', async (req, res) => {
+  const { message, context } = req.body || {};
   const id = crypto.randomBytes(8).toString('hex');
 
   // create a simple stream buffer
   streams.set(id, { clients: [], buffer: [] });
 
-  // enqueue a simple assistant reply (placeholder logic)
-  // In production you can call OpenAI here and stream chunks into the SSE clients
-  const reply = generateAssistantReply(message);
+  // If OPENAI_API_KEY is present, use OpenAI streaming API
+  if (process.env.OPENAI_API_KEY) {
+    try {
+      // Build system prompt using context
+      const system = buildSystemPrompt(context);
+      const payload = {
+        model: 'gpt-3.5-turbo',
+        messages: [
+          { role: 'system', content: system },
+          { role: 'user', content: message }
+        ],
+        stream: true
+      };
 
-  // push simulated chunks
+      const resp = await fetch('https://api.openai.com/v1/chat/completions', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${process.env.OPENAI_API_KEY}`
+        },
+        body: JSON.stringify(payload)
+      });
+
+      if (!resp.ok) {
+        const text = await resp.text();
+        console.error('OpenAI error', text);
+      }
+
+      // stream response chunks to registered clients
+      (async () => {
+        const reader = resp.body.getReader();
+        const decoder = new TextDecoder('utf-8');
+        let done = false;
+        let buffer = '';
+        while (!done) {
+          const { value, done: d } = await reader.read();
+          done = d;
+          if (value) {
+            buffer += decoder.decode(value, { stream: true });
+            const parts = buffer.split('\n\n');
+            buffer = parts.pop();
+            for (const part of parts) {
+              if (part.startsWith('data: ')) {
+                const payload = part.replace(/^data: /, '').trim();
+                if (payload === '[DONE]') {
+                  const doneMsg = JSON.stringify({ event: 'done' });
+                  streams.get(id)?.clients.forEach((c) => c.write(`data: ${doneMsg}\n\n`));
+                  continue;
+                }
+                try {
+                  const parsed = JSON.parse(payload);
+                  const delta = parsed.choices?.[0]?.delta?.content || '';
+                  if (delta) {
+                    const data = JSON.stringify({ event: 'chunk', text: delta });
+                    streams.get(id)?.clients.forEach((c) => c.write(`data: ${data}\n\n`));
+                  }
+                } catch (err) {
+                  console.error('parse stream chunk error', err);
+                }
+              }
+            }
+          }
+        }
+      })();
+
+      res.json({ id });
+      return;
+    } catch (err) {
+      console.error('streaming error', err);
+    }
+  }
+
+  // Fallback: simulated reply when no API key
+  const reply = generateAssistantReply(message, context);
   const chunks = chunkString(reply, 120);
   let i = 0;
   const iv = setInterval(() => {
@@ -63,15 +133,37 @@ function chunkString(str, length) {
   return result;
 }
 
-function generateAssistantReply(message) {
-  // Basic rule-based replies to surface site/plugin info.
+function buildSystemPrompt(context) {
+  const parts = [
+    'You are an assistant that knows about the Voice Analyzer web app and audio plugin chains. Provide concise, actionable answers.'
+  ];
+  if (context) {
+    if (context.activeRecipe) {
+      parts.push(`Active recipe: ${JSON.stringify(context.activeRecipe)}`);
+    }
+    if (context.uploadedFiles) {
+      parts.push(`Uploaded files: ${JSON.stringify(context.uploadedFiles)}`);
+    }
+    if (context.settings) {
+      parts.push(`Current settings: ${JSON.stringify(context.settings)}`);
+    }
+  }
+  return parts.join('\n');
+}
+
+function generateAssistantReply(message, context) {
   if (!message) return 'Hi — ask me about an uploaded file or the plugin chain used for a song.';
   const m = message.toLowerCase();
   if (m.includes('plugins') || m.includes('plugin')) {
-    return 'This project recommends plugin chains such as AutoTune (pitch correction), FabFilter Pro-Q (eq), Waves CLA-2A (compressor). Preset configs: Retune Speed 0ms; EQ: boost 2k by 2dB; Comp ratio 4:1. You can find these plugins in typical plugin stores (Antares, FabFilter, Waves).';
+    // If we have context, try to summarise plugin chains from it
+    if (context && context.activeRecipe && context.activeRecipe.detectedChain) {
+      const chain = context.activeRecipe.detectedChain.map((p) => `${p.pluginName} (${p.category}) — ${p.keySettings || ''}`).join('; ');
+      return `Detected plugin chain: ${chain}`;
+    }
+    return 'This project recommends plugin chains such as AutoTune (pitch correction), FabFilter Pro-Q (eq), Waves CLA-2A (compressor). Typical settings: Retune Speed 0ms; EQ boost around 2k +2dB; Compressor ratio 4:1.';
   }
   if (m.includes('youtube') || m.includes('link')) {
-    return 'For YouTube links we extract audio and run stem separation. The recommended workflow: extract with yt-dlp, run local separation (spleeter/uvr) and then apply the DAW preset chain from the UI.';
+    return 'For YouTube links we extract audio and run stem separation. Recommended workflow: extract with yt-dlp, run separation (Spleeter/UVR), then apply DAW presets from the UI.';
   }
   return "I can summarise the website, list the plugin chain used by an uploaded file (if you uploaded metadata), and show where to find the plugins. Try asking 'what plugins were used on the uploaded file?'.";
 }
