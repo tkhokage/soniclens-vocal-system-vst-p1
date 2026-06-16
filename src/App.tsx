@@ -253,8 +253,28 @@ export default function App() {
         type="file"
         accept="audio/*"
         onChange={(e) => {
-          const file = e.target.files?.[0];
-          if (file) setUploadedFiles([{ name: file.name, size: `${(file.size / 1024 / 1024).toFixed(2)} MB`, artistGuess: "Unknown" }]);
+              const file = e.target.files?.[0];
+              if (file) {
+                setUploadedFiles([{ name: file.name, size: `${(file.size / 1024 / 1024).toFixed(2)} MB`, artistGuess: "Unknown" }]);
+                // load into audio engine
+                loadAudioFileIntoEngine(file);
+
+                // send to server for analysis
+                const form = new FormData();
+                form.append('file', file);
+                setAnalyzing(true);
+                setAnalysisProgress(10);
+                fetch('/analyze', { method: 'POST', body: form })
+                  .then(r => r.json())
+                  .then((data) => {
+                    setAnalysisProgress(80);
+                    if (data && data.detectedChain) {
+                      setActiveRecipe((prev) => ({ ...prev, detectedChain: data.detectedChain }));
+                    }
+                    setTimeout(() => { setAnalysisProgress(100); setAnalyzing(false); }, 600);
+                  })
+                  .catch((err) => { console.error('analysis failed', err); setAnalyzing(false); setAnalysisProgress(0); });
+              }
         }}
         className="hidden"
       />

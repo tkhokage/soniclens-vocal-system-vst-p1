@@ -5,6 +5,9 @@ require('dotenv').config();
 
 const app = express();
 app.use(bodyParser.json({ limit: '5mb' }));
+const multer = require('multer');
+const upload = multer({ dest: 'tmp_uploads/' });
+const fs = require('fs');
 
 // simple in-memory stream registry
 const streams = new Map();
@@ -106,6 +109,44 @@ app.post('/chat', async (req, res) => {
   }, 220);
 
   res.json({ id });
+});
+
+// Analyze uploaded audio file and return simulated plugin chain
+app.post('/analyze', upload.single('file'), (req, res) => {
+  try {
+    const file = req.file;
+    // In production replace with real audio analysis. Here we simulate detection based on filename
+    const name = file.originalname || 'uploaded_audio.wav';
+    const lower = name.toLowerCase();
+
+    let detectedChain = [];
+    if (lower.includes('vocal') || lower.includes('vox') || lower.includes('singer')) {
+      detectedChain = [
+        { pluginName: 'Auto-Tune Pro', category: 'Pitch Correction', purpose: 'Pitch correction', keySettings: 'Retune Speed: 0ms', knobSettings: { 'Retune Speed': 0 } },
+        { pluginName: 'FabFilter Pro-Q 3', category: 'EQ', purpose: 'Presence boost', keySettings: 'Boost 2.2kHz +3dB', knobSettings: { '2.2kHz': '+3dB' } },
+        { pluginName: 'Waves CLA-2A', category: 'Compressor', purpose: 'Vocal leveling', keySettings: 'Ratio 4:1', knobSettings: { 'Ratio': 4 } },
+      ];
+    } else if (lower.includes('mix') || lower.includes('full')) {
+      detectedChain = [
+        { pluginName: 'FabFilter Pro-Q 3', category: 'EQ', purpose: 'Mastering EQ', keySettings: 'Low cut 30Hz', knobSettings: { 'Low cut': 30 } },
+        { pluginName: 'Valhalla VintageVerb', category: 'Reverb', purpose: 'Space', keySettings: 'Decay 2.1s', knobSettings: { 'Decay': 2.1 } },
+      ];
+    } else {
+      // Generic heuristic based on duration
+      detectedChain = [
+        { pluginName: 'Auto-Tune Pro', category: 'Pitch Correction', purpose: 'Subtle pitch', keySettings: 'Retune Speed: 12ms', knobSettings: { 'Retune Speed': 12 } },
+        { pluginName: 'Saturation (Decapitator)', category: 'Saturation', purpose: 'Warmth', keySettings: 'Drive: 24%', knobSettings: { 'Drive': 24 } },
+      ];
+    }
+
+    // Remove temp file
+    try { fs.unlinkSync(req.file.path); } catch (e) {}
+
+    res.json({ detectedChain });
+  } catch (err) {
+    console.error('analyze error', err);
+    res.status(500).json({ error: 'analysis failed' });
+  }
 });
 
 app.get('/stream/:id', (req, res) => {
