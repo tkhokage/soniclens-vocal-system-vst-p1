@@ -4,9 +4,7 @@ const crypto = require('crypto');
 require('dotenv').config();
 
 const app = express();
-app.use(bodyParser.json({ limit: '5mb' }));
-const multer = require('multer');
-const upload = multer({ dest: 'tmp_uploads/' });
+app.use(bodyParser.json({ limit: '50mb' }));
 const fs = require('fs');
 
 // simple in-memory stream registry
@@ -112,11 +110,10 @@ app.post('/chat', async (req, res) => {
 });
 
 // Analyze uploaded audio file and return simulated plugin chain
-app.post('/analyze', upload.single('file'), (req, res) => {
+app.post('/analyze', (req, res) => {
   try {
-    const file = req.file;
-    // In production replace with real audio analysis. Here we simulate detection based on filename
-    const name = file.originalname || 'uploaded_audio.wav';
+    const { filename } = req.body || {};
+    const name = filename || 'uploaded_audio.wav';
     const lower = name.toLowerCase();
 
     let detectedChain = [];
@@ -132,15 +129,12 @@ app.post('/analyze', upload.single('file'), (req, res) => {
         { pluginName: 'Valhalla VintageVerb', category: 'Reverb', purpose: 'Space', keySettings: 'Decay 2.1s', knobSettings: { 'Decay': 2.1 } },
       ];
     } else {
-      // Generic heuristic based on duration
+      // Generic heuristic based on filename
       detectedChain = [
         { pluginName: 'Auto-Tune Pro', category: 'Pitch Correction', purpose: 'Subtle pitch', keySettings: 'Retune Speed: 12ms', knobSettings: { 'Retune Speed': 12 } },
         { pluginName: 'Saturation (Decapitator)', category: 'Saturation', purpose: 'Warmth', keySettings: 'Drive: 24%', knobSettings: { 'Drive': 24 } },
       ];
     }
-
-    // Remove temp file
-    try { fs.unlinkSync(req.file.path); } catch (e) {}
 
     res.json({ detectedChain });
   } catch (err) {

@@ -259,12 +259,10 @@ export default function App() {
                 // load into audio engine
                 loadAudioFileIntoEngine(file);
 
-                // send to server for analysis
-                const form = new FormData();
-                form.append('file', file);
+                // send filename to server for analysis (server simulates detection)
                 setAnalyzing(true);
                 setAnalysisProgress(10);
-                fetch('/analyze', { method: 'POST', body: form })
+                fetch('/analyze', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ filename: file.name }) })
                   .then(r => r.json())
                   .then((data) => {
                     setAnalysisProgress(80);
