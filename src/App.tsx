@@ -15,6 +15,7 @@ import SpotifyPlayerCard from "./components/SpotifyPlayerCard";
 import VstPresetsDeck from "./components/VstPresetsDeck";
 import ThemeToggle from "./components/ThemeToggle";
 import AiChatBox from "./components/AiChatBox";
+import PluginChainPanel from "./components/PluginChainPanel";
 
 const INITIAL_DEMO: VocalRecipe = {
   id: "",
@@ -300,10 +301,10 @@ export default function App() {
               reverbMixCtrl={reverbMixCtrl}
             />
           </div>
-
-          <div className="ps5-panel fade-in-up">
-            <VstPresetsDeck
-              activeRecipe={activeRecipe}
+          <div style={{display:'grid',gridTemplateRows:'1fr auto',gap:12}}>
+            <div className="ps5-panel fade-in-up">
+              <VstPresetsDeck
+                activeRecipe={activeRecipe}
               retuneCtrl={retuneCtrl}
               highpassCtrl={highpassCtrl}
               presenceCtrl={presenceCtrl}
@@ -312,7 +313,10 @@ export default function App() {
               reverbMixCtrl={reverbMixCtrl}
               reverbDecayCtrl={reverbDecayCtrl}
               delayFbCtrl={delayFbCtrl}
-            />
+              />
+            </div>
+
+            <PluginChainPanel chain={activeRecipe.detectedChain} />
           </div>
         </section>
 
