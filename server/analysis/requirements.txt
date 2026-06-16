@@ -1,0 +1,12 @@
+fastapi
+uvicorn[standard]
+librosa
+numpy
+soundfile
+scipy
+pydub
+yt-dlp
+python-multipart
+aiofiles
+# optional: crepe (requires torch), install only if needed
+# crepe

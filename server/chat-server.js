@@ -113,42 +113,63 @@ app.post('/chat', async (req, res) => {
 app.post('/analyze', (req, res) => {
   try {
     const { filename, url } = req.body || {};
-    const name = filename || (url ? url : 'uploaded_audio.wav');
-    const lower = String(name).toLowerCase();
-
-    let detectedChain = [];
-    if (lower.includes('youtube') || lower.includes('youtu.')) {
-      // YouTube URL: simulate extraction + separation and return recommended chain
-      detectedChain = [
-        { pluginName: 'Auto-Tune Pro', category: 'Pitch Correction', purpose: 'Pitch correction for vocals', keySettings: 'Retune Speed: 0ms', knobSettings: { 'Retune Speed': 0 } },
-        { pluginName: 'FabFilter Pro-Q 3', category: 'EQ', purpose: 'Vocal presence boost', keySettings: 'Boost 2.2kHz +3dB', knobSettings: { '2.2kHz': '+3dB' } },
-        { pluginName: 'Waves CLA-2A', category: 'Compressor', purpose: 'Vocal leveling', keySettings: 'Ratio 4:1', knobSettings: { 'Ratio': 4 } },
-      ];
-    } else if (lower.includes('vocal') || lower.includes('vox') || lower.includes('singer')) {
-      detectedChain = [
-        { pluginName: 'Auto-Tune Pro', category: 'Pitch Correction', purpose: 'Pitch correction', keySettings: 'Retune Speed: 0ms', knobSettings: { 'Retune Speed': 0 } },
-        { pluginName: 'FabFilter Pro-Q 3', category: 'EQ', purpose: 'Presence boost', keySettings: 'Boost 2.2kHz +3dB', knobSettings: { '2.2kHz': '+3dB' } },
-        { pluginName: 'Waves CLA-2A', category: 'Compressor', purpose: 'Vocal leveling', keySettings: 'Ratio 4:1', knobSettings: { 'Ratio': 4 } },
-      ];
-    } else if (lower.includes('mix') || lower.includes('full')) {
-      detectedChain = [
-        { pluginName: 'FabFilter Pro-Q 3', category: 'EQ', purpose: 'Mastering EQ', keySettings: 'Low cut 30Hz', knobSettings: { 'Low cut': 30 } },
-        { pluginName: 'Valhalla VintageVerb', category: 'Reverb', purpose: 'Space', keySettings: 'Decay 2.1s', knobSettings: { 'Decay': 2.1 } },
-      ];
-    } else {
-      // Generic heuristic based on filename
-      detectedChain = [
-        { pluginName: 'Auto-Tune Pro', category: 'Pitch Correction', purpose: 'Subtle pitch', keySettings: 'Retune Speed: 12ms', knobSettings: { 'Retune Speed': 12 } },
-        { pluginName: 'Saturation (Decapitator)', category: 'Saturation', purpose: 'Warmth', keySettings: 'Drive: 24%', knobSettings: { 'Drive': 24 } },
-      ];
+    // Try to call the external analysis microservice if available
+    if (process.env.ANALYSIS_SERVICE_URL) {
+      (async () => {
+        try {
+          const svcUrl = `${process.env.ANALYSIS_SERVICE_URL.replace(/\/$/, '')}/analyze`;
+          const payload = url ? { url } : { filename };
+          const r = await fetch(svcUrl, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) });
+          if (r.ok) {
+            const j = await r.json();
+            if (j.detectedChain) return res.json({ detectedChain: j.detectedChain, features: j.features });
+          }
+        } catch (err) {
+          console.error('analysis service call failed', err);
+        }
+        // fallback to local simulation if service fails
+        const sim = simulateChainFromName(filename || url || 'uploaded_audio.wav');
+        res.json({ detectedChain: sim });
+      })();
+      return;
     }
 
-    res.json({ detectedChain });
+    const simulated = simulateChainFromName(filename || url || 'uploaded_audio.wav');
+    res.json({ detectedChain: simulated });
   } catch (err) {
     console.error('analyze error', err);
     res.status(500).json({ error: 'analysis failed' });
   }
 });
+
+function simulateChainFromName(name) {
+  const lower = String(name).toLowerCase();
+  let detectedChain = [];
+  if (lower.includes('youtube') || lower.includes('youtu.')) {
+    detectedChain = [
+      { pluginName: 'Auto-Tune Pro', category: 'Pitch Correction', purpose: 'Pitch correction for vocals', keySettings: 'Retune Speed: 0ms', knobSettings: { 'Retune Speed': 0 } },
+      { pluginName: 'FabFilter Pro-Q 3', category: 'EQ', purpose: 'Vocal presence boost', keySettings: 'Boost 2.2kHz +3dB', knobSettings: { '2.2kHz': '+3dB' } },
+      { pluginName: 'Waves CLA-2A', category: 'Compressor', purpose: 'Vocal leveling', keySettings: 'Ratio 4:1', knobSettings: { 'Ratio': 4 } },
+    ];
+  } else if (lower.includes('vocal') || lower.includes('vox') || lower.includes('singer')) {
+    detectedChain = [
+      { pluginName: 'Auto-Tune Pro', category: 'Pitch Correction', purpose: 'Pitch correction', keySettings: 'Retune Speed: 0ms', knobSettings: { 'Retune Speed': 0 } },
+      { pluginName: 'FabFilter Pro-Q 3', category: 'EQ', purpose: 'Presence boost', keySettings: 'Boost 2.2kHz +3dB', knobSettings: { '2.2kHz': '+3dB' } },
+      { pluginName: 'Waves CLA-2A', category: 'Compressor', purpose: 'Vocal leveling', keySettings: 'Ratio 4:1', knobSettings: { 'Ratio': 4 } },
+    ];
+  } else if (lower.includes('mix') || lower.includes('full')) {
+    detectedChain = [
+      { pluginName: 'FabFilter Pro-Q 3', category: 'EQ', purpose: 'Mastering EQ', keySettings: 'Low cut 30Hz', knobSettings: { 'Low cut': 30 } },
+      { pluginName: 'Valhalla VintageVerb', category: 'Reverb', purpose: 'Space', keySettings: 'Decay 2.1s', knobSettings: { 'Decay': 2.1 } },
+    ];
+  } else {
+    detectedChain = [
+      { pluginName: 'Auto-Tune Pro', category: 'Pitch Correction', purpose: 'Subtle pitch', keySettings: 'Retune Speed: 12ms', knobSettings: { 'Retune Speed': 12 } },
+      { pluginName: 'Saturation (Decapitator)', category: 'Saturation', purpose: 'Warmth', keySettings: 'Drive: 24%', knobSettings: { 'Drive': 24 } },
+    ];
+  }
+  return detectedChain;
+}
 
 app.get('/stream/:id', (req, res) => {
   const { id } = req.params;
