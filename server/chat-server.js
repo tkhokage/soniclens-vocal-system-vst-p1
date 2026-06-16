@@ -112,12 +112,19 @@ app.post('/chat', async (req, res) => {
 // Analyze uploaded audio file and return simulated plugin chain
 app.post('/analyze', (req, res) => {
   try {
-    const { filename } = req.body || {};
-    const name = filename || 'uploaded_audio.wav';
-    const lower = name.toLowerCase();
+    const { filename, url } = req.body || {};
+    const name = filename || (url ? url : 'uploaded_audio.wav');
+    const lower = String(name).toLowerCase();
 
     let detectedChain = [];
-    if (lower.includes('vocal') || lower.includes('vox') || lower.includes('singer')) {
+    if (lower.includes('youtube') || lower.includes('youtu.')) {
+      // YouTube URL: simulate extraction + separation and return recommended chain
+      detectedChain = [
+        { pluginName: 'Auto-Tune Pro', category: 'Pitch Correction', purpose: 'Pitch correction for vocals', keySettings: 'Retune Speed: 0ms', knobSettings: { 'Retune Speed': 0 } },
+        { pluginName: 'FabFilter Pro-Q 3', category: 'EQ', purpose: 'Vocal presence boost', keySettings: 'Boost 2.2kHz +3dB', knobSettings: { '2.2kHz': '+3dB' } },
+        { pluginName: 'Waves CLA-2A', category: 'Compressor', purpose: 'Vocal leveling', keySettings: 'Ratio 4:1', knobSettings: { 'Ratio': 4 } },
+      ];
+    } else if (lower.includes('vocal') || lower.includes('vox') || lower.includes('singer')) {
       detectedChain = [
         { pluginName: 'Auto-Tune Pro', category: 'Pitch Correction', purpose: 'Pitch correction', keySettings: 'Retune Speed: 0ms', knobSettings: { 'Retune Speed': 0 } },
         { pluginName: 'FabFilter Pro-Q 3', category: 'EQ', purpose: 'Presence boost', keySettings: 'Boost 2.2kHz +3dB', knobSettings: { '2.2kHz': '+3dB' } },

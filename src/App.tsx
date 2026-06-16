@@ -17,24 +17,16 @@ import ThemeToggle from "./components/ThemeToggle";
 import AiChatBox from "./components/AiChatBox";
 
 const INITIAL_DEMO: VocalRecipe = {
-  id: "demo-travis",
-  songTitle: "SICKO MODE",
-  artistName: "Travis Scott",
-  confidence: 96,
-  detectedChain: [
-    {
-      pluginName: "AutoTune Pro",
-      category: "Pitch Correction",
-      purpose: "Hard-snapping pitch correction",
-      keySettings: "Retune speed: 0ms",
-      knobSettings: { "Retune Speed": 0 }
-    }
-  ],
+  id: "",
+  songTitle: "",
+  artistName: "",
+  confidence: 0,
+  detectedChain: [],
   simplifiedChain: [],
-  artistDna: { "Travis Scott": 96 },
-  explanation: "High confidence match",
-  frequencyCritique: "Bright presence with clear highs",
-  acapellaAcousticsDescription: "Clean isolated vocal"
+  artistDna: {},
+  explanation: "",
+  frequencyCritique: "",
+  acapellaAcousticsDescription: ""
 };
 
 const POPULAR_SEARCH_PROMPTS = [
@@ -102,16 +94,24 @@ export default function App() {
     setAnalyzing(true);
     setAnalysisProgress(0);
 
-    const interval = setInterval(() => {
-      setAnalysisProgress((prev) => (prev >= 100 ? 100 : prev + Math.random() * 40));
-    }, 200);
+    // If this looks like a URL (YouTube), ask server to analyze URL
+    setAnalysisProgress(10);
+    try {
+      const body: any = {};
+      if (isYoutube || titleOrUrl.includes('youtu')) body.url = titleOrUrl;
+      else body.filename = titleOrUrl;
 
-    setTimeout(() => {
-      clearInterval(interval);
+      const localSeed = await fetch('/analyze', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) }).then(r => r.json());
+      if (localSeed && localSeed.detectedChain) {
+        setActiveRecipe(prev => ({ ...prev, detectedChain: localSeed.detectedChain, songTitle: titleOrUrl, artistName: '' }));
+      }
+    } catch (err) {
+      console.error('analyze url failed', err);
+    } finally {
       setAnalysisProgress(100);
       setAnalyzing(false);
       setSearchInput("");
-    }, 2000);
+    }
   };
 
   // Basic client-side analysis heuristics to detect reverb, saturation, autotune-like pitch stability
