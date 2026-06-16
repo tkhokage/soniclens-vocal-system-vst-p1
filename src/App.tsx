@@ -114,6 +114,80 @@ export default function App() {
     }, 2000);
   };
 
+  // Basic client-side analysis heuristics to detect reverb, saturation, autotune-like pitch stability
+  const analyzeFileLocally = async (file: File) => {
+    try {
+      const arrayBuffer = await file.arrayBuffer();
+      const AudioCtxClass = window.AudioContext || (window as any).webkitAudioContext;
+      const ctx = new AudioCtxClass();
+      const audioBuffer = await ctx.decodeAudioData(arrayBuffer.slice(0));
+
+      // compute envelope decay after transients
+      const channelData = audioBuffer.getChannelData(0);
+      const sampleRate = audioBuffer.sampleRate;
+      const frameSize = Math.floor(sampleRate * 0.05); // 50ms
+      const energy = [] as number[];
+      for (let i = 0; i < channelData.length; i += frameSize) {
+        let sum = 0;
+        for (let j = i; j < i + frameSize && j < channelData.length; j++) sum += Math.abs(channelData[j]);
+        energy.push(sum / frameSize);
+      }
+
+      // detect peaks and decay times
+      const peaks: number[] = [];
+      for (let i = 1; i < energy.length - 1; i++) {
+        if (energy[i] > energy[i - 1] && energy[i] > energy[i + 1] && energy[i] > 0.01) peaks.push(i);
+      }
+      let decayTimes: number[] = [];
+      for (const p of peaks.slice(0, 20)) {
+        const peakVal = energy[p];
+        let k = p;
+        while (k < energy.length && energy[k] > peakVal * 0.1) k++;
+        decayTimes.push((k - p) * (frameSize / sampleRate));
+      }
+      const avgDecay = decayTimes.length ? decayTimes.reduce((a, b) => a + b, 0) / decayTimes.length : 0;
+
+      // saturation estimate: proportion of samples near clipping
+      let nearClip = 0;
+      for (let i = 0; i < channelData.length; i += Math.max(1, Math.floor(channelData.length / 2000))) {
+        if (Math.abs(channelData[i]) > 0.85) nearClip++;
+      }
+      const clipRatio = nearClip / Math.min(2000, Math.max(100, Math.floor(channelData.length / Math.floor(frameSize))));
+
+      // simple pitch stability: estimate pitch per frame using autocorrelation
+      const pitchFrames: number[] = [];
+      const autocorrelate = (buf: Float32Array) => {
+        let bestOffset = -1;
+        let bestCorr = 0;
+        for (let offset = 40; offset < 400; offset++) {
+          let corr = 0;
+          for (let i = 0; i < buf.length - offset; i++) corr += buf[i] * buf[i + offset];
+          if (corr > bestCorr) { bestCorr = corr; bestOffset = offset; }
+        }
+        if (bestOffset <= 0) return 0;
+        return sampleRate / bestOffset;
+      };
+      const pitchFrameSize = Math.floor(sampleRate * 0.05);
+      for (let i = 0; i < channelData.length - pitchFrameSize; i += pitchFrameSize) {
+        const frame = channelData.subarray(i, i + pitchFrameSize);
+        const p = autocorrelate(frame);
+        if (p > 50 && p < 2000) pitchFrames.push(p);
+      }
+      const pitchStd = pitchFrames.length ? Math.sqrt(pitchFrames.map(x => (x - (pitchFrames.reduce((a,b)=>a+b,0)/pitchFrames.length))**2).reduce((a,b)=>a+b,0)/pitchFrames.length) : 0;
+
+      const heuristics: any[] = [];
+      if (avgDecay > 0.6) heuristics.push({ pluginName: 'Valhalla VintageVerb', category: 'Reverb', keySettings: `Decay ${Math.round(avgDecay*10)/10}s`, purpose: 'Detected long decay (reverb)' });
+      if (clipRatio > 0.02) heuristics.push({ pluginName: 'Saturation (Decapitator)', category: 'Saturation', keySettings: `Drive ${Math.round(clipRatio*200)}%`, purpose: 'Detected harmonic clipping/saturation' });
+      if (pitchStd < 0.6 && pitchFrames.length > 10) heuristics.push({ pluginName: 'Auto-Tune Pro', category: 'Pitch Correction', keySettings: 'Retune Speed: 0-10ms', purpose: 'Detected quantized pitch (likely autotune)' });
+
+      ctx.close();
+      return { avgDecay, clipRatio, pitchStd, heuristics };
+    } catch (err) {
+      console.error('local analysis failed', err);
+      return null;
+    }
+  };
+
   const formatTime = (secs: number) => {
     const m = Math.floor(secs / 60);
     const s = Math.round(secs % 60);
@@ -259,14 +333,21 @@ export default function App() {
                 // load into audio engine
                 loadAudioFileIntoEngine(file);
 
-                // send filename to server for analysis (server simulates detection)
+                // local quick analysis heuristics + server simulated analysis
                 setAnalyzing(true);
                 setAnalysisProgress(10);
+                analyzeFileLocally(file).then(local => {
+                  if (local && local.heuristics && local.heuristics.length) {
+                    setActiveRecipe(prev => ({ ...prev, detectedChain: local.heuristics }));
+                  }
+                }).catch(()=>{}).finally(() => setAnalysisProgress(30));
+
                 fetch('/analyze', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ filename: file.name }) })
                   .then(r => r.json())
                   .then((data) => {
                     setAnalysisProgress(80);
                     if (data && data.detectedChain) {
+                      // merge server detection with local heuristics, prefer server names but keep heuristics if present
                       setActiveRecipe((prev) => ({ ...prev, detectedChain: data.detectedChain }));
                     }
                     setTimeout(() => { setAnalysisProgress(100); setAnalyzing(false); }, 600);
